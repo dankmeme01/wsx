@@ -93,7 +93,7 @@ arc::Future<> amain() {
 
     if (!result) {
         std::println("Connection failed: {}", result.unwrapErr());
-        co_return 1;
+        co_return;
     }
 
     wsx::AsyncClient client = std::move(result).unwrap();
@@ -102,7 +102,7 @@ arc::Future<> amain() {
     auto result2 = co_await client.recv();
     if (!result2) {
         std::println("Recv failed: {}", result2.unwrapErr());
-        co_return 1;
+        co_return;
     }
 
     wsx::Message msg = std::move(result2).unwrap();
