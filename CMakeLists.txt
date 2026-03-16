@@ -9,7 +9,7 @@ endif()
 project(wsx)
 option(WSX_ENABLE_TLS "Enable TLS" OFF)
 option(WSX_ENABLE_ASYNC "Enable async client api" OFF)
-option(WSX_BUILD_WOLFSSL "Build wolfSSL as crypto backend" OFF)
+option(WSX_BUILD_MBEDTLS "Build MbedTLS as crypto backend" OFF)
 option(WSX_BUNDLE_CACERTS "Bundle CA certificates" ON)
 option(WSX_BUILD_EXAMPLES "Build examples" OFF)
 
@@ -30,43 +30,17 @@ if (WSX_ENABLE_ASYNC)
     target_compile_definitions(wsx PUBLIC WSX_ENABLE_ASYNC)
 endif()
 
-# if BUILD_WOLFSSL is set, enable xtls and add wolfssl as a dependency
-if (WSX_BUILD_WOLFSSL)
-    CPMAddPackage(
-        URI "gh:wolfSSL/wolfssl@5.8.4-stable"
-        OPTIONS "WOLFSSL_HARDEN OFF"
-                "WOLFSSL_OLD_TLS OFF"
-                "WOLFSSL_OPENSSLEXTRA ON"
-                "WOLFSSL_ALPN ON"
-                "WOLFSSL_SNI ON"
-                "WOLFSSL_TLSV12 ON"
-                "WOLFSSL_SESSION_TICKET ON"
-                "WOLFSSL_INSTALL OFF"
-                "WOLFSSL_CRYPT_TESTS OFF"
-                "WOLFSSL_EXAMPLES OFF"
-                "WOLFSSL_ALT_CERT_CHAINS ON"
-                "WOLFSSL_DEBUG ON"
-                "BUILD_SHARED_LIBS OFF"
-    )
-
-    get_target_property(WOLFSSL_INCLUDE_DIRS2 wolfssl INCLUDE_DIRECTORIES)
-    set(WOLFSSL_INCLUDE_DIRS ${WOLFSSL_INCLUDE_DIRS2} CACHE STRING "" FORCE)
-
-    if (MSVC)
-        target_compile_options(wolfssl PRIVATE /w)
-    else()
-        target_compile_options(wolfssl PRIVATE -w)
-    endif()
-
+# if user chose the mbedtls option, use it in xtls
+if (WSX_BUILD_MBEDTLS)
     set(WSX_ENABLE_TLS ON)
 endif()
 
 # Add xtls if not already added
 if (WSX_ENABLE_TLS AND NOT TARGET xtls)
     CPMAddPackage(
-        URI "gh:dankmeme01/xtls#063cf60"
+        URI "gh:dankmeme01/xtls#0b10793"
         OPTIONS
-            "XTLS_ENABLE_WOLFSSL ${WSX_BUILD_WOLFSSL}"
+            "XTLS_ENABLE_MBEDTLS ${WSX_BUILD_MBEDTLS}"
             "XTLS_ENABLE_SOCKET ON"
             "XTLS_ENABLE_ARC_SOCKET ${WSX_ENABLE_ASYNC}"
     )

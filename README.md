@@ -1,7 +1,7 @@
 # wsx
 
 A modern C++23 WebSockets client, with the following features:
-* TLS library agnostic, wsx uses [xtls](https://github.com/dankmeme01/xtls), which has built-in OpenSSL and wolfSSL backends and makes it easy to implement a TLS backend with the library of your preference
+* TLS library agnostic, wsx uses [xtls](https://github.com/dankmeme01/xtls), which has built-in OpenSSL, wolfSSL and MbedTLS backends and makes it easy to implement a TLS backend with the library of your preference
 * Synchronous (blocking) API and (optional) asynchronous API based on [Arc](https://github.com/dankmeme01/arc)
 
 # Usage
@@ -43,26 +43,26 @@ int main() {
 }
 ```
 
-## TLS via static wolfSSL
+## TLS via static MbedTLS
 
-This is the simplest way of getting `wss://` support, by using the [wolfSSL](https://github.com/wolfSSL/wolfssl) library.
+This is the simplest way of getting `wss://` support, by using the [MbedTLS](https://github.com/Mbed-TLS/mbedtls) library.
 
 ```cmake
 CPMAddPackage(
     URI "gh:dankmeme01/wsx#main"
-    OPTIONS "WSX_BUILD_WOLFSSL ON"
+    OPTIONS "WSX_BUILD_MBEDTLS ON"
 )
 ```
 
 ## TLS via xtls
 
-If the static wolfSSL option does not suffice, you can use the [xtls](https://github.com/dankmeme01/xtls) library and manually choose between one of the built-in backends (such as OpenSSL or wolfSSL), or implement your own backend with a different TLS library.
+If the static MbedTLS option does not suffice, you can use the [xtls](https://github.com/dankmeme01/xtls) library and manually choose between one of the built-in backends (such as OpenSSL or wolfSSL), or implement your own backend with a different TLS library.
 
-Here's an example of how you could build this library using OpenSSL for TLS. Unlike the wolfSSL example, this uses `find_package` to find OpenSSL in your system. This means you likely will need to specify `OPENSSL_ROOT_DIR` when cross compiling.
+Here's an example of how you could build this library using OpenSSL for TLS. Unlike MbedTLS, this uses `find_package` to find OpenSSL in your system. This means you likely will need to specify `OPENSSL_ROOT_DIR` when cross compiling.
 
 ```cmake
 CPMAddPackage(
-    URI "gh:dankmeme01/xtls#063cf60"
+    URI "gh:dankmeme01/xtls#0b10793"
     OPTIONS "XTLS_ENABLE_OPENSSL ON"
 )
 
@@ -80,7 +80,7 @@ The example below shows how to enable async support (with TLS) and how to use th
 CPMAddPackage(
     URI "gh:dankmeme01/wsx#main"
     OPTIONS "WSX_ENABLE_ASYNC ON"
-            "WSX_BUILD_WOLFSSL ON"
+            "WSX_BUILD_MBEDTLS ON"
 )
 ```
 
