@@ -3,7 +3,6 @@
 A modern C++23 WebSockets client, with the following features:
 * TLS library agnostic, wsx uses [xtls](https://github.com/dankmeme01/xtls), which has built-in OpenSSL and wolfSSL backends and makes it easy to implement a TLS backend with the library of your preference
 * Synchronous (blocking) API and (optional) asynchronous API based on [Arc](https://github.com/dankmeme01/arc)
-* A TON of configurability!
 
 # Usage
 
