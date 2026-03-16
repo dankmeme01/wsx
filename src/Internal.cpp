@@ -1,0 +1,395 @@
+#include <wsx/Internal.hpp>
+#include <random>
+#include <base64.hpp>
+#include "sha1.hpp"
+
+#ifdef WSX_BUNDLE_CACERTS
+#include <ca_bundle.h>
+#endif
+
+namespace wsx {
+
+ClientBase::ClientBase() {}
+ClientBase::~ClientBase() {}
+
+static bool equalsIgnoreCase(std::string_view a, std::string_view b) {
+    return std::equal(a.begin(), a.end(), b.begin(), b.end(), [](auto c1, auto c2) {
+        return std::tolower((unsigned char)c1) == std::tolower((unsigned char)c2);
+    });
+}
+
+static std::string nonceToKey(uint8_t(&nonce)[16]) {
+    return base64::encode_into<std::string>(nonce, nonce + 16);
+}
+
+static std::string nonceToAcceptKey(uint8_t(&nonce)[16]) {
+    auto key = nonceToKey(nonce);
+    key += "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+    // hash with sha1
+    class SHA1 sha;
+    sha.update(key);
+    auto hash = sha.final();
+
+    // base64 encode
+    return base64::encode_into<std::string>(hash.begin(), hash.end());
+}
+
+std::string ClientBase::generateRequest(uint8_t(&nonce)[16], const ClientConnectOptions& options) {
+    wsx::_genrandom(nonce, 16);
+    auto encodedKey = nonceToKey(nonce);
+
+    std::string req =  fmt::format(
+        "GET {} HTTP/1.1\r\n"
+        "Host: {}\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Key: {}\r\n"
+        "Sec-WebSocket-Version: 13\r\n",
+        options.path.empty() ? "/" : options.path,
+        options.hostname.empty() ? "localhost" : options.hostname,
+        encodedKey
+    );
+
+    for (auto& [key, value] : options.headers) {
+        req += fmt::format("{}: {}\r\n", key, value);
+    }
+
+    req += "\r\n";
+
+    return req;
+}
+
+Result<ParsedHttpResponse> ClientBase::parseResponse(uint8_t(&nonce)[16], std::string_view response) {
+    ParsedHttpResponse out;
+
+    auto statusEnd = response.find("\r\n");
+    if (statusEnd == std::string_view::npos) {
+        return Err("Invalid response: no status line");
+    }
+
+    auto statusLine = response.substr(0, statusEnd);
+    auto bodyStart = response.substr(statusEnd + 2);
+    // skip "HTTP/1.1 "
+    if (!statusLine.starts_with("HTTP/1.1 ")) {
+        return Err("Invalid response: status line does not start with 'HTTP/1.1 '");
+    }
+    statusLine.remove_prefix(9);
+
+    auto codeEnd = statusLine.find_first_of(" \r\n");
+    if (codeEnd == std::string_view::npos) {
+        return Err("Invalid response: status code not found");
+    }
+
+    auto codeStr = statusLine.substr(0, codeEnd);
+    int code = 0;
+    auto [ptr, ec] = std::from_chars(&*codeStr.begin(), &*codeStr.end(), code);
+    if (ec != std::errc()) {
+        return Err("Invalid response: status code is not a valid integer");
+    }
+
+    // finally, check the code
+    if (code != 101) {
+        return Err(fmt::format("Handshake failed: HTTP code {}", code));
+    }
+
+    // parse the headers
+    while (true) {
+        auto lineEnd = bodyStart.find("\r\n");
+        if (lineEnd == std::string_view::npos) {
+            return Err("Invalid response header");
+        }
+
+        auto line = bodyStart.substr(0, lineEnd);
+        bodyStart.remove_prefix(lineEnd + 2);
+
+        if (line.empty()) {
+            break; // end of headers
+        }
+
+        auto colonPos = line.find(": ");
+        if (colonPos == std::string_view::npos) {
+            return Err("Invalid response header");
+        }
+
+        auto name = line.substr(0, colonPos);
+        auto value = line.substr(colonPos + 2);
+        out.headers.emplace_back(name, value);
+    }
+
+    // check the required headers
+    bool hasUpgrade = false;
+    bool hasConnection = false;
+    bool hasAccept = false;
+
+    for (auto& [key, value] : out.headers) {
+        if (equalsIgnoreCase(key, "Upgrade") && equalsIgnoreCase(value, "websocket")) {
+            hasUpgrade = true;
+            continue;
+        }
+
+        if (equalsIgnoreCase(key, "Connection") && equalsIgnoreCase(value, "Upgrade")) {
+            hasConnection = true;
+            continue;
+        }
+
+        if (equalsIgnoreCase(key, "Sec-WebSocket-Accept")) {
+            hasAccept = true;
+            auto expectedAccept = nonceToAcceptKey(nonce);
+            if (value != expectedAccept) {
+                return Err("Handshake failed: invalid Sec-WebSocket-Accept value");
+            }
+        }
+    }
+
+    if (!hasUpgrade || !hasConnection || !hasAccept) {
+        return Err("Handshake failed: missing required headers");
+    }
+
+    return Ok(std::move(out));
+}
+
+#ifdef WSX_ENABLE_TLS
+
+Result<std::shared_ptr<xtls::Context>> createContext() {
+    auto res = xtls::Backend::get().createContext(xtls::ContextType::Client);
+    if (!res) {
+        return Err(fmt::format("Context creation failed: {}", res.unwrapErr().message));
+    }
+
+    auto ctx = std::move(res).unwrap();
+
+#ifdef WSX_BUNDLE_CACERTS
+    auto res2 = ctx->loadCACertsBlob(CA_BUNDLE_CONTENT);
+#else
+    auto res2 = ctx->loadSystemCACerts();
+#endif
+
+    if (!res2) {
+        return Err(fmt::format("Failed to load CA certificates: {}", res2.unwrapErr().message));
+    }
+
+    return Ok(std::move(ctx));
+}
+
+#endif
+
+void _genrandom(void* buf, size_t size) {
+    std::random_device rd{};
+    uint8_t* p = static_cast<uint8_t*>(buf);
+
+    while (size > 0) {
+        uint32_t randomValue = rd();
+        size_t toCopy = std::min(size, sizeof(randomValue));
+        std::memcpy(p, &randomValue, toCopy);
+        p += toCopy;
+        size -= toCopy;
+    }
+}
+
+Result<> _writeMessage(qn::CircularByteBuffer& buffer, const Message& message) {
+    using enum Message::Type;
+
+    if (message.isControl() && message.data().size() > 125) {
+        return Err("Control frame payload cannot be larger than 125 bytes");
+    }
+
+    uint8_t header[14] = {0};
+    size_t headerLen = 2;
+    uint8_t& opcode = header[0];
+    uint8_t& maskAndLen = header[1];
+
+    switch (message.type()) {
+        case Text: opcode = 0x1; break;
+        case Binary: opcode = 0x2; break;
+        case Close: opcode = 0x8; break;
+        case Ping: opcode = 0x9; break;
+        case Pong: opcode = 0xA; break;
+        default: return Err("Invalid message type when encoding message");
+    }
+    opcode |= 0x80; // set FIN bit
+
+    auto msgdata = message.data();
+    uint64_t msglen = msgdata.size();
+
+    // since we are a client implementation, all messages must be masked
+    bool mask = true;
+    if (mask) maskAndLen = 0x80;
+
+    if (msglen < 126) {
+        maskAndLen |= static_cast<uint8_t>(msglen);
+    } else if (msglen <= 0xFFFF) {
+        maskAndLen |= 126;
+        header[2] = (msglen >> 8) & 0xFF;
+        header[3] = msglen & 0xFF;
+        headerLen += 2;
+    } else {
+        maskAndLen |= 127;
+        for (size_t i = 0; i < 8; i++) {
+            header[2 + i] = (msglen >> (56 - 8 * i)) & 0xFF;
+        }
+        headerLen += 8;
+    }
+
+    uint32_t maskingKey = 0;
+    if (mask) {
+        wsx::_genrandom(&maskingKey, sizeof(maskingKey));
+        uint8_t* mkbytes = header + headerLen;
+        std::memcpy(mkbytes, &maskingKey, sizeof(maskingKey));
+        headerLen += 4;
+    }
+
+    buffer.write(header, headerLen);
+
+    // now write the potentially masked payload
+    if (mask) {
+        // scratch space to avoid calling write a ton of times
+        uint8_t scratch[1024];
+        size_t scratchPos = 0;
+
+        uint8_t maskBytes[4];
+        std::memcpy(maskBytes, &maskingKey, sizeof(maskingKey));
+
+        for (size_t i = 0; i < msglen; i++) {
+            uint8_t maskedByte = msgdata[i] ^ maskBytes[i % 4];
+            scratch[scratchPos++] = maskedByte;
+
+            if (scratchPos == sizeof(scratch)) {
+                buffer.write(scratch, scratchPos);
+                scratchPos = 0;
+            }
+        }
+
+        if (scratchPos > 0) {
+            buffer.write(scratch, scratchPos);
+        }
+    } else {
+        buffer.write(msgdata.data(), msglen);
+    }
+
+    return Ok();
+}
+
+Result<std::optional<Message>> _readOneMessage(qn::CircularByteBuffer& buffer) {
+    using enum Message::Type;
+
+    size_t headerLen = 2;
+    uint8_t shortHeader[2];
+
+    if (buffer.size() < headerLen) {
+        return Ok(std::nullopt);
+    }
+
+    buffer.peek(shortHeader, 2);
+
+    bool fin = shortHeader[0] & 0x80;
+    uint8_t opcode = shortHeader[0] & 0x0F;
+    bool masked = shortHeader[1] & 0x80;
+    uint64_t payloadLen = shortHeader[1] & 0x7F;
+
+    uint8_t extendedPayloadLen[8] = {0};
+
+    if (payloadLen == 126) {
+        headerLen += 2;
+        if (buffer.size() < headerLen) {
+            return Ok(std::nullopt);
+        }
+
+        buffer.peek(extendedPayloadLen, 2, 2);
+        payloadLen = std::byteswap(*reinterpret_cast<uint16_t*>(extendedPayloadLen));
+    } else if (payloadLen == 127) {
+        headerLen += 8;
+        if (buffer.size() < headerLen) {
+            return Ok(std::nullopt);
+        }
+
+        buffer.peek(extendedPayloadLen, 8, 2);
+        payloadLen = std::byteswap(*reinterpret_cast<uint64_t*>(extendedPayloadLen));
+    }
+
+    if (masked) {
+        return Err("Received masked frame from server");
+    }
+
+    if (buffer.size() < headerLen + payloadLen) {
+        return Ok(std::nullopt);
+    }
+
+    Message::Type type;
+    switch (opcode) {
+        case 0x0: type = Fragment; break;
+        case 0x1: type = Text; break;
+        case 0x2: type = Binary; break;
+        case 0x8: type = Close; break;
+        case 0x9: type = Ping; break;
+        case 0xA: type = Pong; break;
+        default: return Err("Received frame with invalid opcode");
+    }
+
+    std::vector<uint8_t> payload(payloadLen);
+    buffer.peek(payload.data(), payloadLen, headerLen);
+    buffer.skip(headerLen + payloadLen);
+
+    Message msg(type, std::move(payload));
+    msg.setFinal(fin);
+
+    return Ok(std::move(msg));
+}
+
+static Result<Message> reassemble(std::vector<Message>& fragments) {
+    // first frame MUST be a non-control and non-fragment frame
+    if (fragments.empty()) {
+        return Err("No fragments to reassemble");
+    }
+    auto& first = fragments[0];
+    if (first.isControl() || first.type() == Message::Type::Fragment) {
+        return Err("First fragment must be a non-control, non-fragment frame");
+    }
+
+    Message::Type finalType = first.type();
+    std::vector<uint8_t> data;
+
+    for (size_t i = 0; i < fragments.size(); i++) {
+        auto& fragment = fragments[i];
+        if (i != 0 && fragment.type() != Message::Type::Fragment) {
+            return Err("Invalid type in fragmented message");
+        }
+
+        auto fragdata = fragment.data();
+        data.insert(data.end(), fragdata.begin(), fragdata.end());
+    }
+
+    return Ok(Message(finalType, std::move(data)));
+}
+
+Result<std::optional<Message>> _readAndReassembleMessage(qn::CircularByteBuffer& buffer, std::vector<Message>& fragments) {
+    GEODE_UNWRAP_INTO(auto one, _readOneMessage(buffer));
+
+    // need more data?
+    if (!one) return Ok(std::nullopt);
+
+    Message msg = std::move(*one);
+
+    // is this a complete message that is NOT a fragment?
+    if (msg.final() && msg.type() != Message::Type::Fragment) {
+        return Ok(std::move(msg));
+    }
+
+    // is this the final fragment in a message?
+    if (msg.final() && msg.type() == Message::Type::Fragment) {
+        if (fragments.empty()) {
+            return Err("Received final fragment but no fragments have been received");
+        }
+
+        // append this fragment to the previous ones and return the complete message
+        fragments.push_back(std::move(msg));
+        GEODE_UNWRAP_INTO(auto complete, reassemble(fragments));
+        return Ok(std::move(complete));
+    }
+
+    // otherwise, this is either the first frame or a continuation
+    fragments.push_back(std::move(msg));
+    return Ok(std::nullopt);
+}
+
+}
