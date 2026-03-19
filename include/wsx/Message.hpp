@@ -81,18 +81,17 @@ struct Message {
         return std::move(m_data);
     }
 
-    uint16_t closeCode() {
+    uint16_t closeCode() const {
         if (!isClose()) {
             throw std::runtime_error("Message is not close");
         }
         if (m_data.size() < 2) {
             throw std::runtime_error("Not enough data for the close code");
         }
-        uint16_t code = uint16_t(m_data[0] << 8) + m_data[1];
-        return code;
+        return uint16_t(m_data[0] << 8) + m_data[1];
     }
 
-    std::string_view closeReason() {
+    std::string_view closeReason() const {
         if (!isClose()) {
             throw std::runtime_error("Message is not close");
         }
