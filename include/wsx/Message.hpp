@@ -81,6 +81,26 @@ struct Message {
         return std::move(m_data);
     }
 
+    uint16_t closeCode() const {
+        if (!isClose()) {
+            throw std::runtime_error("Message is not close");
+        }
+        if (m_data.size() < 2) {
+            return 1005;
+        }
+        return uint16_t(m_data[0] << 8) + m_data[1];
+    }
+
+    std::string_view closeReason() const {
+        if (!isClose()) {
+            throw std::runtime_error("Message is not close");
+        }
+        if (m_data.size() < 2) {
+            return "";
+        }
+        return std::string_view((const char*)m_data.data() + 2, m_data.size() - 2);
+    }
+
     /// Performs certain validations and returns an error if the message is invalid. Specifically:
     /// - check if Text frame is valid UTF-8
     /// - check if control message payload is <= 125 bytes
