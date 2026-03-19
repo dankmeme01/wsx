@@ -86,7 +86,7 @@ struct Message {
             throw std::runtime_error("Message is not close");
         }
         if (m_data.size() < 2) {
-            return 0;
+            return 1005;
         }
         return uint16_t(m_data[0] << 8) + m_data[1];
     }
