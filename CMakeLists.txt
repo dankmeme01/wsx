@@ -38,7 +38,7 @@ endif()
 # Add xtls if not already added
 if (WSX_ENABLE_TLS AND NOT TARGET xtls)
     CPMAddPackage(
-        URI "gh:dankmeme01/xtls#0b10793"
+        URI "gh:dankmeme01/xtls#4d0af76"
         OPTIONS
             "XTLS_ENABLE_MBEDTLS ${WSX_BUILD_MBEDTLS}"
             "XTLS_ENABLE_SOCKET ON"

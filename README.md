@@ -62,7 +62,7 @@ Here's an example of how you could build this library using OpenSSL for TLS. Unl
 
 ```cmake
 CPMAddPackage(
-    URI "gh:dankmeme01/xtls#0b10793"
+    URI "gh:dankmeme01/xtls#4d0af76"
     OPTIONS "XTLS_ENABLE_OPENSSL ON"
 )
 
