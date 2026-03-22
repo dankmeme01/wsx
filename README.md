@@ -64,6 +64,7 @@ Here's an example of how you could build this library using OpenSSL for TLS. Unl
 CPMAddPackage(
     URI "gh:dankmeme01/xtls#4d0af76"
     OPTIONS "XTLS_ENABLE_OPENSSL ON"
+            "XTLS_ENABLE_SOCKET ON" # socket must be enabled
 )
 
 CPMAddPackage(
@@ -83,6 +84,8 @@ CPMAddPackage(
             "WSX_BUILD_MBEDTLS ON"
 )
 ```
+
+**If using custom TLS, `XTLS_ENABLE_ARC_SOCKET` MUST be enabled in xtls!**
 
 ```cpp
 #include <wsx/AsyncClient.hpp>
