@@ -1,6 +1,8 @@
 #include <wsx/CircularByteBuffer.hpp>
 #include <cstring>
 #include <cassert>
+#include <cstdint>
+#include <algorithm>
 #include <stdexcept>
 
 #define WSX_DEBUG_ASSERT(cond) assert(cond)
