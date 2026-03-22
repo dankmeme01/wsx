@@ -46,6 +46,10 @@ public:
 
     /// Flushes the internal buffer, sending all pending messages to the peer.
     arc::Future<Result<void>> flush();
+    /// Flushes the internal buffer, attempting to send any pending data to the peer.
+    /// This does not block and returns the amount of bytes successfully sent, or an error if no data can be sent.
+    /// If there is no data to flush, returns Ok(0).
+    Result<size_t> tryFlush();
 
     /// Receives a message from the server, blocking until data is available.
     /// If this returns an error, the error is fatal and the client will be disconnected. All future sends and recv calls will fail.
@@ -58,6 +62,10 @@ public:
 
     /// Closes the connection without waiting for an acknowledgment from the server.
     arc::Future<Result<>> closeNoAck(uint16_t code = 1000, std::string_view reason = "");
+
+    /// Closes the connection synchronously, attempting to send a close frame if it's appropriate, without blocking.
+    /// Like `closeNoAck`, this does not wait for a reply.
+    Result<> closeSync(uint16_t code = 1000, std::string_view reason = "");
 
     /// Returns whether a connection is still active
     bool isConnected() const {

@@ -3,10 +3,10 @@
 #include <cassert>
 #include <stdexcept>
 
-#define QN_DEBUG_ASSERT(cond) assert(cond)
-#define QN_ASSERT(cond) assert(cond)
+#define WSX_DEBUG_ASSERT(cond) assert(cond)
+#define WSX_ASSERT(cond) assert(cond)
 
-namespace qn {
+namespace wsx {
 
 CircularByteBuffer::CircularByteBuffer() : CircularByteBuffer(0) {}
 
@@ -81,13 +81,13 @@ void CircularByteBuffer::clear() {
 void CircularByteBuffer::reserve(size_t extra) {
     this->growUntilAtLeast(this->capacity() + extra);
 
-    QN_DEBUG_ASSERT(this->writeWindow().size() >= extra);
+    WSX_DEBUG_ASSERT(this->writeWindow().size() >= extra);
 }
 
 void CircularByteBuffer::reserveUntil(size_t cap) {
     this->growUntilAtLeast(cap);
 
-    QN_DEBUG_ASSERT(this->capacity() >= cap);
+    WSX_DEBUG_ASSERT(this->capacity() >= cap);
 }
 
 size_t CircularByteBuffer::capacity() const {
@@ -117,7 +117,7 @@ void CircularByteBuffer::write(std::span<const uint8_t> data) {
         this->growUntilAtLeast(this->size() + data.size());
     }
 
-    QN_DEBUG_ASSERT(this->capacity() >= this->size() + data.size());
+    WSX_DEBUG_ASSERT(this->capacity() >= this->size() + data.size());
 
     auto wnd1 = this->writeWindow();
     size_t write1Len = std::min<size_t>(data.size(), wnd1.size());
@@ -130,7 +130,7 @@ void CircularByteBuffer::write(std::span<const uint8_t> data) {
         auto wnd2 = this->writeWindow();
         size_t write2Len = data.size() - write1Len;
 
-        QN_DEBUG_ASSERT(wnd2.size() >= write2Len && "CircularByteBuffer::write: not enough space in the second window");
+        WSX_DEBUG_ASSERT(wnd2.size() >= write2Len && "CircularByteBuffer::write: not enough space in the second window");
 
         std::memcpy(wnd2.data(), data.data() + write1Len, write2Len);
         this->advanceWrite(write2Len);
@@ -145,8 +145,8 @@ std::span<uint8_t> CircularByteBuffer::writeWindow() {
     if (size == 0) {
         // this means m_start == m_end, which means buffer is either full or empty.
         if (m_size == 0) {
-            QN_ASSERT(m_start == m_data);
-            QN_ASSERT(m_end == m_data);
+            WSX_ASSERT(m_start == m_data);
+            WSX_ASSERT(m_end == m_data);
 
             return std::span<uint8_t>{
                 m_data,
@@ -188,7 +188,7 @@ void CircularByteBuffer::read(void* dest, size_t len) {
 void CircularByteBuffer::peek(void* dest, size_t len, size_t skip) const {
     if (len == 0) return;
 
-    QN_ASSERT(dest && "CircularByteBuffer::peek called with null destination");
+    WSX_ASSERT(dest && "CircularByteBuffer::peek called with null destination");
 
     auto bufs = this->peek(len, skip);
     std::memcpy(dest, bufs.first.data(), bufs.first.size());
@@ -234,9 +234,9 @@ CircularByteBuffer::WrappedRead CircularByteBuffer::peek(size_t len, size_t skip
         };
     }
 
-    QN_DEBUG_ASSERT(out.first.size() + out.second.size() == len);
-    QN_DEBUG_ASSERT(out.first.data() >= m_data && out.first.data() < m_endAlloc);
-    QN_DEBUG_ASSERT(out.second.empty() || (out.second.data() >= m_data && out.second.data() < m_endAlloc));
+    WSX_DEBUG_ASSERT(out.first.size() + out.second.size() == len);
+    WSX_DEBUG_ASSERT(out.first.data() >= m_data && out.first.data() < m_endAlloc);
+    WSX_DEBUG_ASSERT(out.second.empty() || (out.second.data() >= m_data && out.second.data() < m_endAlloc));
 
     return out;
 }

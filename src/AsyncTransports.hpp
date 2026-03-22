@@ -15,6 +15,7 @@ public:
 
     Future<Result<size_t>> send(const void* data, size_t size);
     Future<Result<size_t>> receive(void* buf, size_t size);
+    Result<size_t> trySend(const void* buf, size_t size);
 
 private:
     arc::TcpStream m_stream;
@@ -32,6 +33,7 @@ public:
 
     Future<Result<size_t>> send(const void* data, size_t size);
     Future<Result<size_t>> receive(void* buf, size_t size);
+    Result<size_t> trySend(const void* buf, size_t size);
 
 private:
     xtls::AsyncTlsSocket m_stream;

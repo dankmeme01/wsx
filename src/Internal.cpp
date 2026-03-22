@@ -292,7 +292,7 @@ void _genrandom(void* buf, size_t size) {
     }
 }
 
-Result<> _writeMessage(qn::CircularByteBuffer& buffer, const Message& message) {
+Result<> _writeMessage(wsx::CircularByteBuffer& buffer, const Message& message) {
     using enum Message::Type;
 
     GEODE_UNWRAP(message.validate());
@@ -373,7 +373,7 @@ Result<> _writeMessage(qn::CircularByteBuffer& buffer, const Message& message) {
     return Ok();
 }
 
-Result<std::optional<Message>> _readOneMessage(qn::CircularByteBuffer& buffer) {
+Result<std::optional<Message>> _readOneMessage(wsx::CircularByteBuffer& buffer) {
     using enum Message::Type;
 
     size_t headerLen = 2;
@@ -489,7 +489,7 @@ static Result<Message> reassemble(std::vector<Message>& fragments) {
     return Ok(std::move(msg));
 }
 
-Result<std::optional<Message>> _readAndReassembleMessage(qn::CircularByteBuffer& buffer, std::vector<Message>& fragments) {
+Result<std::optional<Message>> _readAndReassembleMessage(wsx::CircularByteBuffer& buffer, std::vector<Message>& fragments) {
     while (true) {
         GEODE_UNWRAP_INTO(auto one, _readOneMessage(buffer));
 

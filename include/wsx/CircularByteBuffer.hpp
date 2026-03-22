@@ -1,10 +1,9 @@
 #pragma once
 
-#include <vector>
 #include <span>
 #include <stdint.h>
 
-namespace qn {
+namespace wsx {
 
 // Circular byte buffer implementation.
 // This buffer allows efficient amortized read/write operations, which are a simple memcpy,
@@ -97,4 +96,4 @@ private:
     void growTo(size_t newCap);
 };
 
-}
+} // namespace wsx

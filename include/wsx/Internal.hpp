@@ -36,6 +36,7 @@ public:
 
     virtual arc::Future<Result<size_t>> send(const void* data, size_t size) = 0;
     virtual arc::Future<Result<size_t>> receive(void* buf, size_t size) = 0;
+    virtual Result<size_t> trySend(const void* buf, size_t size) = 0;
 };
 #endif
 
@@ -60,8 +61,8 @@ struct ClientConnectOptions {
 
 class ClientBase {
 protected:
-    qn::CircularByteBuffer m_rbuf;
-    qn::CircularByteBuffer m_wbuf;
+    wsx::CircularByteBuffer m_rbuf;
+    wsx::CircularByteBuffer m_wbuf;
     std::vector<Message> m_fragments;
 
     // maybe make this configurable later?
@@ -90,12 +91,12 @@ Result<std::shared_ptr<xtls::Context>> createContext();
 #endif
 
 void _genrandom(void* buf, size_t size);
-Result<> _writeMessage(qn::CircularByteBuffer& buffer, const Message& message);
+Result<> _writeMessage(wsx::CircularByteBuffer& buffer, const Message& message);
 
 /// Returns nullopt if more data is required. Any other error should be treated as fatal.
-Result<std::optional<Message>> _readOneMessage(qn::CircularByteBuffer& buffer);
+Result<std::optional<Message>> _readOneMessage(wsx::CircularByteBuffer& buffer);
 /// Returns nullopt if more data is required. Any other error should be treated as fatal.
-Result<std::optional<Message>> _readAndReassembleMessage(qn::CircularByteBuffer& buffer, std::vector<Message>& fragments);
+Result<std::optional<Message>> _readAndReassembleMessage(wsx::CircularByteBuffer& buffer, std::vector<Message>& fragments);
 
 bool isValidUtf8(std::string_view data);
 bool isValidUtf8(std::span<const uint8_t> data);

@@ -105,6 +105,21 @@ Future<Result<void>> AsyncClient::flush() {
     co_return Ok();
 }
 
+Result<size_t> AsyncClient::tryFlush() {
+    if (!m_transport) return Err("Connection is closed");
+
+    size_t sent = 0;
+
+    while (!m_wbuf.empty()) {
+        auto wrp = m_wbuf.peek(m_wbuf.size());
+        GEODE_UNWRAP_INTO(auto bytes, m_transport->trySend(wrp.first.data(), wrp.first.size()));
+        sent += bytes;
+        m_wbuf.skip(bytes);
+    }
+
+    return Ok(sent);
+}
+
 Future<Result<Message>> AsyncClient::recv() {
     if (!m_transport) co_return Err("Connection is closed");
 
@@ -163,6 +178,19 @@ Future<Result<>> AsyncClient::closeNoAck(uint16_t code, std::string_view reason)
     GEODE_CO_UNWRAP(co_await sendCloseFrame(code, reason));
     m_transport.reset();
     co_return Ok();
+}
+
+Result<> AsyncClient::closeSync(uint16_t code, std::string_view reason) {
+    if (!m_transport) return Err("Connection is already closed");
+
+    auto frame = makeCloseFrame(code, reason);
+    GEODE_UNWRAP(_writeMessage(m_wbuf, frame));
+
+    auto res = this->tryFlush();
+    m_transport.reset();
+    GEODE_UNWRAP(res);
+
+    return Ok();
 }
 
 Future<Result<>> AsyncClient::sendCloseFrame(uint16_t code, std::string_view reason) {
