@@ -24,7 +24,7 @@ endif()
 # Link arc if async api is enabled
 if (WSX_ENABLE_ASYNC)
     if (NOT TARGET arc)
-        CPMAddPackage("gh:dankmeme01/arc@1.5.4")
+        CPMAddPackage("gh:dankmeme01/arc@1.6.0")
     endif()
     target_link_libraries(wsx PUBLIC arc)
     target_compile_definitions(wsx PUBLIC WSX_ENABLE_ASYNC)
@@ -38,7 +38,7 @@ endif()
 # Add xtls if not already added
 if (WSX_ENABLE_TLS AND NOT TARGET xtls)
     CPMAddPackage(
-        URI "gh:dankmeme01/xtls#12695fe"
+        URI "gh:dankmeme01/xtls@1.0.0"
         OPTIONS
             "XTLS_ENABLE_MBEDTLS ${WSX_BUILD_MBEDTLS}"
             "XTLS_ENABLE_SOCKET ON"
@@ -54,7 +54,7 @@ endif()
 
 # Link required dependencies (Result, qsox, base64, fmt)
 if (NOT TARGET GeodeResult)
-    CPMAddPackage("gh:geode-sdk/result@1.4.1")
+    CPMAddPackage("gh:geode-sdk/result@1.5.0")
 endif()
 if (NOT TARGET qsox)
     CPMAddPackage("gh:dankmeme01/qsox#1cd9dd7")
@@ -66,13 +66,13 @@ if (NOT TARGET base64)
     )
 endif()
 if (NOT TARGET fmt)
-    CPMAddPackage("gh:fmtlib/fmt#12.1.0")
+    CPMAddPackage("gh:fmtlib/fmt#12.2.0")
 endif()
 target_link_libraries(wsx PUBLIC GeodeResult qsox base64 fmt)
 
 # Bundle CA certificates
 if (WSX_BUNDLE_CACERTS)
-    CPMAddPackage("gh:geode-sdk/net_libs@8.19.0-10")
+    CPMAddPackage("gh:geode-sdk/net_libs@8.22.0-1")
     target_compile_definitions(wsx PUBLIC WSX_BUNDLE_CACERTS)
     target_link_libraries(wsx PRIVATE ca-bundle)
 endif()
